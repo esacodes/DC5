@@ -12,6 +12,8 @@ library(sf)
 library(ggplot2)
 library(rgdal)
 library(broom)
+library(tidytext)
+library(ggwordcloud)
 
 ```
 
@@ -64,9 +66,7 @@ ggplot() +
 
 ask about extensions and shapefile, whether we can just use the shapefile itself 
 
-```{r}
-library(tidytext)
-```
+# Text Analysis
 
 ```{r}
 YInt_data <- read_csv("YInt.csv")
@@ -94,9 +94,6 @@ glimpse(YInt_data)
 YInt_word %>% filter(str_detect(word, "missing"))
 ```
 
-```{r}
-library(ggwordcloud)
-```
 ```{r}
 wordclouddata<- YInt_word %>% 
   group_by(location) %>% 
