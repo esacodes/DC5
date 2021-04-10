@@ -3,3 +3,62 @@ title: "Main Analysis"
 output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyr)
+library(readr)
+library(sf)
+library(ggplot2)
+library(rgdal)
+library(broom)
+
+```
+
+
+# Sensor Data
+
+## Import
+```{r}
+MobileSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/MobileSensorReadings.csv")
+    #                              , 
+    # col_types = cols(Timestamp = col_datetime(format = "%Y-%M-%D %H:%M:%S\t")))
+
+StaticSensorLocations <- read_csv("DC5-Data/Sensor Data and Maps/StaticSensorLocations.csv")
+
+StaticSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/StaticSensorReadings.csv")
+```
+
+```{r}
+StHimark <- st_read(
+  "DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/StHimark.shp")
+```
+
+
+
+## Shapefile 
+
+```{r}
+ggplot() + 
+  geom_sf(data = StHimark, size = 0.25, color = "white", fill = "#69b3a2") + 
+  ggtitle("Boundary Plot") + 
+  coord_sf() +
+  theme_void()
+```
+
+this one has neighbourhoods
+
+```{r}
+my_spdf <- readOGR( 
+  dsn= "DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/", 
+  layer="StHimark",
+  verbose=FALSE)
+
+spdf_fortified <- tidy(my_spdf)
+# Plot it
+ggplot() +
+  geom_polygon(data = spdf_fortified, aes( x = long, y = lat, group = group),
+               fill="#69b3a2", color="white") +
+  theme_void()
+```
+
+ask about extensions and shapefile, whether we can just use the shapefile itself 

@@ -37,3 +37,24 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+*.png
+*.sbx
+*.sbn
+DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/StHimark.shx
+DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/StHimark.shp
+DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/StHimark.prj
+DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/StHimark.dbf
+DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/StHimark.cpg
+DC5-Data/VAST 2019 - St. Himark - About Our City.docx
+DC5-Data/.DS_Store
+DC5-Data/Damage Reports/.DS_Store
+DC5-Data/Damage Reports/MC1-DataDescription.docx
+DC5-Data/Damage Reports/mc1-reports-data.csv
+DC5-Data/Sensor Data and Maps/.DS_Store
+DC5-Data/Sensor Data and Maps/MC2_datadescription.docx
+DC5-Data/Sensor Data and Maps/MobileSensorReadings.csv
+DC5-Data/Sensor Data and Maps/StaticSensorLocations.csv
+DC5-Data/Sensor Data and Maps/StaticSensorReadings.csv
+DC5-Data/Y*Int Social Media Data/.DS_Store
+DC5-Data/Y*Int Social Media Data/MC3 Data Readme.txt
+DC5-Data/Y*Int Social Media Data/YInt.csv
