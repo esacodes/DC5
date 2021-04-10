@@ -22,19 +22,24 @@ library(ggwordcloud)
 
 ## Import
 ```{r}
-MobileSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/MobileSensorReadings.csv")
-    #                              , 
-    # col_types = cols(Timestamp = col_datetime(format = "%Y-%M-%D %H:%M:%S\t")))
+# Solved the datetime problem, just change class using other functions, not readr
+
+MobileSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/MobileSensorReadings.csv") %>% 
+  mutate(time = as.POSIXct(Timestamp)) %>% select(-Timestamp)
 
 StaticSensorLocations <- read_csv("DC5-Data/Sensor Data and Maps/StaticSensorLocations.csv")
 
-StaticSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/StaticSensorReadings.csv")
+StaticSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/StaticSensorReadings.csv") %>% 
+  mutate(time = as.POSIXct(Timestamp)) %>% select(-Timestamp)
 ```
 
 ```{r}
 StHimark <- st_read(
   "DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/StHimark.shp")
 ```
+
+
+## Sensor 
 
 
 
@@ -51,17 +56,17 @@ ggplot() +
 this one has neighbourhoods
 
 ```{r}
-my_spdf <- readOGR( 
-  dsn= "DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/", 
-  layer="StHimark",
-  verbose=FALSE)
-
-spdf_fortified <- tidy(my_spdf)
-# Plot it
-ggplot() +
-  geom_polygon(data = spdf_fortified, aes( x = long, y = lat, group = group),
-               fill="#69b3a2", color="white") +
-  theme_void()
+# my_spdf <- readOGR( 
+#   dsn= "DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/", 
+#   layer="StHimark",
+#   verbose=FALSE)
+# 
+# spdf_fortified <- tidy(my_spdf)
+# # Plot it
+# ggplot() +
+#   geom_polygon(data = spdf_fortified, aes( x = long, y = lat, group = group),
+#                fill="#69b3a2", color="white") +
+#   theme_void()
 ```
 
 ask about extensions and shapefile, whether we can just use the shapefile itself 
