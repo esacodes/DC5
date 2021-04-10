@@ -5,6 +5,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 library(tidyr)
 library(readr)
 library(sf)
@@ -62,3 +63,59 @@ ggplot() +
 ```
 
 ask about extensions and shapefile, whether we can just use the shapefile itself 
+
+```{r}
+library(tidytext)
+```
+
+```{r}
+YInt_data <- read_csv("YInt.csv")
+```
+```{r}
+glimpse(YInt_data)
+```
+
+```{r}
+data(stop_words)
+YInt_word <- YInt_data %>%
+  unnest_tokens(word, message) 
+
+YInt_word %>% 
+  anti_join(stop_words) %>% 
+  count(word, sort = TRUE)
+```
+```{r}
+pattern <- "dog"
+grepl(pattern, YInt_data$word, ignore.case = FALSE, perl = FALSE, fixed = FALSE, useBytes = FALSE)
+```
+
+```{r}
+glimpse(YInt_data)
+YInt_word %>% filter(str_detect(word, "missing"))
+```
+
+```{r}
+library(ggwordcloud)
+```
+```{r}
+wordclouddata<- YInt_word %>% 
+  group_by(location) %>% 
+  anti_join(stop_words) %>% 
+  count(word, sort = TRUE) %>% 
+  head(100)
+glimpse(wordclouddata)
+```
+```{r}
+set.seed(53)
+ggplot(wordclouddata, aes(label = word, size = n)) +
+  geom_text_wordcloud() +
+  #scale_size_area(max_size = 10) +
+  facet_wrap(location) +
+  theme_minimal()
+```
+
+Goals:
+- word cloud for each location (preferably overlaid on map)
+- missing dog (dachschund)
+- anything interesting in messages
+
