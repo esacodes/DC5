@@ -74,71 +74,48 @@ ask about extensions and shapefile, whether we can just use the shapefile itself
 # Text Analysis
 
 ```{r}
+#Reading in the data
 YInt_data <- read_csv("YInt.csv")
 ```
-```{r}
-YInt_data
-```
 
 ```{r}
+#Tidying the data
+
 data(stop_words)
+#Goal: I would like to be able to use token = "tweets" in order to preserve # and @ (which are important in understanding tweeting patterns). I don't understand the error message that comes up when I do that, though
 YInt_word <- YInt_data %>%
-  unnest_tweets(word, message) 
+  unnest_tokens(word, message) %>% 
+  anti_join(stop_words)
 
 YInt_word %>% 
-  anti_join(stop_words) %>% 
   count(word, sort = TRUE)
 ```
 
 ```{r}
-library(stringr)
-remove_reg <- "&amp;|&lt;|&gt;"
-tidy_tweets <- YInt_data %>% 
-  #filter(!str_detect(message, "^RT")) %>%
-  mutate(message = str_remove_all(text, remove_reg)) %>%
-  unnest_tokens(word, message, token = "tweets") 
-```
-%>%
-  filter(!word %in% stop_words$word,
-         !word %in% str_remove_all(stop_words$word, "'"),
-         str_detect(word, "[a-z]"))
-```
-
-```{r}
-pattern <- "dog"
-grepl(pattern, YInt_data$word, ignore.case = FALSE, perl = FALSE, fixed = FALSE, useBytes = FALSE)
-```
-
-```{r}
-glimpse(YInt_data)
+#There was something about a missing dog?
 YInt_word %>% filter(str_detect(word, "missing"))
 ```
 
 ```{r}
+#Generating a word cloud from the most frequent words
+
 wordclouddata<- YInt_word %>% 
-  group_by(location) %>% 
-  anti_join(stop_words) %>% 
+  #group_by(location) %>% 
   count(word, sort = TRUE) %>% 
   head(100)
-glimpse(wordclouddata)
-```
-```{r}
+#glimpse(wordclouddata)
+
 set.seed(53)
 ggplot(wordclouddata, aes(label = word, size = n)) +
-  geom_text_wordcloud() +
+  geom_text_wordcloud() #+
   #scale_size_area(max_size = 10) +
-  facet_wrap(location) +
-  theme_minimal()
-```
-
-```{r}
-YInt_word %>% 
-  mutate(first = substr(as.character(word), 1, 1))
+  #theme_minimal()
 ```
 
 
-Goals:
+Goals from group meeting:
 - word cloud for each location (preferably overlaid on map)
 - missing dog (dachschund)
 - anything interesting in messages
+
 
