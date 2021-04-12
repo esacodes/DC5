@@ -77,18 +77,33 @@ ask about extensions and shapefile, whether we can just use the shapefile itself
 YInt_data <- read_csv("YInt.csv")
 ```
 ```{r}
-glimpse(YInt_data)
+YInt_data
 ```
 
 ```{r}
 data(stop_words)
 YInt_word <- YInt_data %>%
-  unnest_tokens(word, message) 
+  unnest_tweets(word, message) 
 
 YInt_word %>% 
   anti_join(stop_words) %>% 
   count(word, sort = TRUE)
 ```
+
+```{r}
+library(stringr)
+remove_reg <- "&amp;|&lt;|&gt;"
+tidy_tweets <- YInt_data %>% 
+  #filter(!str_detect(message, "^RT")) %>%
+  mutate(message = str_remove_all(text, remove_reg)) %>%
+  unnest_tokens(word, message, token = "tweets") 
+```
+%>%
+  filter(!word %in% stop_words$word,
+         !word %in% str_remove_all(stop_words$word, "'"),
+         str_detect(word, "[a-z]"))
+```
+
 ```{r}
 pattern <- "dog"
 grepl(pattern, YInt_data$word, ignore.case = FALSE, perl = FALSE, fixed = FALSE, useBytes = FALSE)
@@ -115,6 +130,12 @@ ggplot(wordclouddata, aes(label = word, size = n)) +
   facet_wrap(location) +
   theme_minimal()
 ```
+
+```{r}
+YInt_word %>% 
+  mutate(first = substr(as.character(word), 1, 1))
+```
+
 
 Goals:
 - word cloud for each location (preferably overlaid on map)
