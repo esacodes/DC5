@@ -34,6 +34,7 @@ StaticSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/StaticSensorRead
 
 # Image no label with colored neighborhoods
 img <- png::readPNG("DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodMapNoLabels.png")
+img1<- png::readPNG("DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodMap.png")
 ```
 
 ```{r}
@@ -72,12 +73,11 @@ ggplot(MobileSensorReadings_by_min, aes(x=time, y=min_Value)) + geom_line()
 
 
 ```{r}
-# map + geom_point(data = MobileSensorReadings, aes(x=Long, y=Lat))
 set.seed(21)
 small_MobileSensorReadings <- MobileSensorReadings %>%
   sample_frac(0.2)
-ggplot() + geom_point(data = small_MobileSensorReadings, aes(x=Long, y=Lat)) +
-  geom_point(data = StaticSensorLocations, aes(x = Long, y = Lat, color = "red")) 
+# ggplot() + geom_point(data = small_MobileSensorReadings, aes(x=Long, y=Lat)) +
+  # geom_point(data = StaticSensorLocations, aes(x = Long, y = Lat, color = "red")) 
 ```
 
 By location
@@ -85,61 +85,71 @@ By location
 ```{r}
 set.seed(21)
 MobileSensorReadings_byloc <- small_MobileSensorReadings %>%
-  sample_frac(0.001) %>% # test smaller 
+  sample_frac(0.01) %>% # test smaller
   mutate(hour=lubridate::floor_date(time, "1 hour")) %>%
-  group_by(Long, Lat, hour) %>% mutate(min_Value = sum(Value))
+  group_by(Long, Lat, hour) %>% mutate(hourly_Value = sum(Value))
 
 fig <- MobileSensorReadings_byloc %>%
   plot_ly(
-    x = ~Long, 
-    y = ~Lat, 
-    size = ~min_Value, 
-    color = ~min_Value, 
+    x = ~Long, y = ~Lat, 
     frame = ~as.character(hour), 
     type = 'scatter',
-    mode = 'markers'
-  )%>%
-  animation_opts(0) %>%
+    mode = 'markers',
+    marker = list(
+      color = ~hourly_Value, 
+      size = 19, # size = ~hourly_Value, sizeref = 16, 
+      opacity=.9,
+      colorscale = list(c(0, "#a0c2fa"), c(1, "red")), showscale=T,
+      cauto = F, cmin = 0, cmax =  max(MobileSensorReadings_byloc$hourly_Value),
+        # 5172437 for the entire dataset
+      line = list(color = 'rgb(231, 99, 250)',
+        width = 2)
+      )
+    )%>%
+  animation_opts(50) %>%
+  # plot_ly(x = c(-119.9999, -119.7117), y = c(0.017057,0.238372)) %>%
   layout(
-    image = list(  
-      source =  raster2uri(as.raster(img)),
+    images = list(
+      source = raster2uri(as.raster(img1)),
+      x = -119.9999, y = 0.008,
+      sizex = 0.288152, sizey = 0.230372,
       xref = "x", yref = "y",
-      x = -119.9999,  y = 0.017057,
       xanchor = "left", yanchor = "bottom",
-      sizex = 0.288152,
-      # max(MobileSensorReadings$Long)-min(MobileSensorReadings$Long), 
-      sizey =0.221315, 
-      # max(MobileSensorReadings$Lat)-min(MobileSensorReadings$Lat),
-      sizing = "stretch"
-      # opacity = 0.8,
-      # layer = "below"
-    )
+      sizing = "stretch", opacity = 0.7,
+      layer = "below"
+    ), xaxis = list(title=""), yaxis = list(title="")
+  ) %>%
+  animation_slider(
+    currentvalue = list(prefix = "time ", font = list(color="red"))
   )
+
 fig
 
 plot_ly(x = c(-119.9999, -119.7117), y = c(0.017057,0.238372)) %>%
   layout(
     image = list(
-      source =  raster2uri(as.raster(img)),
-      x = -119.9999,  y = 0.017057,
-      sizex = 0.288152, sizey =0.221315,
-      xref = "x", yref = "y",
-      xanchor = "left", yanchor = "bottom",
-      sizing = "stretch"
-    )
-  )
-
-plot_ly() %>%
-  layout(
-    images = list(
       source = raster2uri(as.raster(img)),
-      x = -2, y = 2, 
-      sizex = 2, sizey = 1,
+      x = -119.9999,  y = 0.017057,
+      sizex = 0.288152, sizey = 0.221315,
       xref = "x", yref = "y",
       xanchor = "left", yanchor = "bottom",
       sizing = "stretch"
     )
   )
+#---- Adjusting the map in plotly
+# plot_ly(x = c(-119.9999, -119.7117), y = c(0.017057,0.238372)) %>%
+# plot_ly(MobileSensorReadings_byloc, x = ~Long, 
+#     y = ~Lat) %>%
+#   layout(
+#     images = list(
+#       source = raster2uri(as.raster(img)),
+#       x = -119.9999, y = 0.008, 
+#       sizex = 0.288152, sizey = 0.230372,
+#       xref = "x", yref = "y",
+#       xanchor = "left", yanchor = "bottom",
+#       sizing = "stretch", layer = "below"
+#     )
+#   )
 ```
 
 
