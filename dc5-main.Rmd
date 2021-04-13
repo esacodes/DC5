@@ -152,9 +152,6 @@ Goals from group meeting:
 
 
 # Trying to overlay word clouds on map
-```{r}
-library(shiny)
-```
 
 ```{r}
 map2 <- ggplot() + 
@@ -165,8 +162,14 @@ map2 <- ggplot() +
   theme(legend.position = "none")
 ```
 
+```{r}
+#https://www.tutorialkart.com/r-tutorial/concatenate-two-or-more-strings-in-r/
+a <- "a"
+b <- paste(a,"b", sep="")
+```
 
 ```{r}
+#https://plotly.com/r/subplots/
 wordclouddata<- YInt_word %>% 
   filter(location == "Old Town") %>% 
   count(word, sort = TRUE) %>% 
@@ -198,4 +201,74 @@ plot_ly(hoverinfo = "none") %>%
 Okay so THAT WORKED AND IT SHOWS IMAGES!!!
 VERY IMPORTANT: source!!! I whole-scale copied and pasted that part, including the .js file which made the tooltip even possible, and I don't even know javascript so I should NOT take credit for that!! I got it from here: https://plotly-r.com/supplying-custom-data.html#fig:tooltip-image
 
+Info on ggsave: https://www.tutorialgateway.org/save-r-ggplot-using-ggsave/
+```{r}
+location_word_cloud <- function(neighborhood) {
+  
+wordclouddata<- YInt_word %>% 
+  filter(location == neighborhood) %>% 
+  count(word, sort = TRUE) %>% 
+  head(100)
 
+set.seed(53)
+wordcloud <- ggplot(wordclouddata, aes(label = word, size = n)) +
+  geom_text_wordcloud() +
+  #scale_size_area(max_size = 10) +
+  theme_minimal()
+
+name <- paste(neighborhood, ".png", sep = "")
+ggsave(path = "images", filename = name)
+
+}
+#I wasn't sure if i could save within a function but apparently i can yay https://stackoverflow.com/questions/28176528/saving-within-a-function-in-r
+
+```
+
+```{r}
+#checking --- IT WORKS!
+location_word_cloud("East Parton")
+```
+
+```{r}
+neighborhoods <- list(levels(StHimark$Nbrhood))
+#problem: it was giving me the levels and not just the names https://stackoverflow.com/questions/27676404/list-all-factor-levels-of-a-data-frame
+pmap(neighborhoods, location_word_cloud)
+```
+
+
+Okay so now I need to find a way to connect this to the map. For the custom js tooltip, I need to put text onto the map. I'm not sure if a normal geom_sf label will work, so I'm going to add text using geom_text onto a point in each neighborhood. However, in order to do this I need a point that is definitely within each neighborhood -- I'll try st_point_on_surface, found from https://r-spatial.github.io/sf/reference/geos_unary.html
+
+Wait I found a resource that walks you through doing exactly that: https://yutani.rbind.io/post/geom-sf-text-and-geom-sf-label-are-coming/
+
+```{r}
+text_points <- sf::st_point_on_surface(StHimark)
+
+
+# retrieve the coordinates
+text_coords <- as.data.frame(sf::st_coordinates(text_points))
+text_coords$NAME <- StHimark$Nbrhood
+```
+
+```{r}
+map4 <- ggplot() +
+  geom_sf(data = StHimark, aes(fill = Nbrhood)) +
+  geom_text(data = text_coords, aes(X, Y, label = NAME), color = "white") +
+  theme_void() +
+  theme(legend.position = "none")
+```
+
+```{r}
+uris <- purrr::map_chr(
+  neighborhoods, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
+)
+ggplotly(map4) %>%
+  htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+```
+
+```{r}
+neighborhoods
+logos <- c("r-logo", "penguin", "rstudio")
+logos
+```
+
+Hmm I wonder if the problem is that the neighborhoods list doesn't look like the logos list -- maybe that's preventing it from being a description for the filename.
