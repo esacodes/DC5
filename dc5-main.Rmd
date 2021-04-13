@@ -107,7 +107,7 @@ fig
 
 ```{r}
 #Reading in the data
-YInt_data <- read_csv("YInt.csv")
+YInt_data <- read_csv("DC5-Data/Y*Int Social Media Data/YInt.csv")
 ```
 
 ```{r}
@@ -149,5 +149,53 @@ Goals from group meeting:
 - word cloud for each location (preferably overlaid on map)
 - missing dog (dachschund)
 - anything interesting in messages
+
+
+# Trying to overlay word clouds on map
+```{r}
+library(shiny)
+```
+
+```{r}
+map2 <- ggplot() + 
+  geom_sf(data = StHimark, size = 0.25, aes(fill = Nbrhood, color = Nbrhood)) + 
+  ggtitle("Boundary Plot") + 
+  coord_sf() +
+  theme_void() +
+  theme(legend.position = "none")
+```
+
+
+```{r}
+wordclouddata<- YInt_word %>% 
+  filter(location == "Old Town") %>% 
+  count(word, sort = TRUE) %>% 
+  head(10)
+
+set.seed(53)
+wordcloud <- ggplot(wordclouddata, aes(label = word, size = n)) +
+  geom_text_wordcloud() #+
+  #scale_size_area(max_size = 10) +
+  #theme_minimal()
+
+#subplot(map2, wordcloud)
+#THIS WON'T WORK BECAUSE WORDCLOUDS HAVEN'T BEEN COMBINED WITH PLOTLY YET i'm so sad :'(
+```
+```{r}
+x <- 1:3 
+y <- 1:3
+logos <- c("r-logo", "penguin", "rstudio")
+# base64 encoded string of each image
+uris <- purrr::map_chr(
+  logos, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
+)
+# hoverinfo = "none" will hide the plotly.js tooltip, but the 
+# plotly_hover event will still fire
+plot_ly(hoverinfo = "none") %>%
+  add_text(x = x, y = y, customdata = uris, text = logos) %>%
+  htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+```
+Okay so THAT WORKED AND IT SHOWS IMAGES!!!
+VERY IMPORTANT: source!!! I whole-scale copied and pasted that part, including the .js file which made the tooltip even possible, and I don't even know javascript so I should NOT take credit for that!! I got it from here: https://plotly-r.com/supplying-custom-data.html#fig:tooltip-image
 
 
