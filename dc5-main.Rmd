@@ -51,7 +51,7 @@ map <- ggplot() +
   # coord_sf(xlim = c(0,100), ylim = c(0,100)) +
   theme_void() 
 
-ggplotly(map)
+# ggplotly(map)
 ```
 
 ask about extensions and shapefile, whether we can just use the shapefile itself 
@@ -85,29 +85,26 @@ By location
 ```{r}
 set.seed(21)
 MobileSensorReadings_byloc <- small_MobileSensorReadings %>%
-  sample_frac(0.01) %>% # test smaller
+  sample_frac(0.1) %>% # test smaller
   mutate(hour=lubridate::floor_date(time, "1 hour")) %>%
   group_by(Long, Lat, hour) %>% mutate(hourly_Value = sum(Value))
 
 fig <- MobileSensorReadings_byloc %>%
   plot_ly(
-    x = ~Long, y = ~Lat, 
-    frame = ~as.character(hour), 
-    type = 'scatter',
-    mode = 'markers',
+    x = ~Long, y = ~Lat, frame = ~as.character(hour), 
+    size = ~hourly_Value, sizes = c(10, 50),
+    color = ~hourly_Value, 
+    type = 'scatter', mode = 'markers', 
     marker = list(
-      color = ~hourly_Value, 
-      size = 19, # size = ~hourly_Value, sizeref = 16, 
-      opacity=.9,
-      colorscale = list(c(0, "#a0c2fa"), c(1, "red")), showscale=T,
+      sizemode = 'diameter',
+      colorscale = list(c(0, 'rgba(255, 199, 130,0.75)'),
+                        c(1, 'rgba(173, 30, 2, 1)')), showscale=T,
       cauto = F, cmin = 0, cmax =  max(MobileSensorReadings_byloc$hourly_Value),
         # 5172437 for the entire dataset
-      line = list(color = 'rgb(231, 99, 250)',
-        width = 2)
+      line = list(color = 'rgba(51, 6, 0, 1)', width = 2)
       )
     )%>%
-  animation_opts(50) %>%
-  # plot_ly(x = c(-119.9999, -119.7117), y = c(0.017057,0.238372)) %>%
+  animation_opts(0) %>%
   layout(
     images = list(
       source = raster2uri(as.raster(img1)),
@@ -120,10 +117,12 @@ fig <- MobileSensorReadings_byloc %>%
     ), xaxis = list(title=""), yaxis = list(title="")
   ) %>%
   animation_slider(
-    currentvalue = list(prefix = "time ", font = list(color="red"))
-  )
+    currentvalue = list(prefix = "timestamp ", font = list(color="red"))
+  ) %>% hide_colorbar()
 
 fig
+
+#------ Adjusting the map in plotly
 
 plot_ly(x = c(-119.9999, -119.7117), y = c(0.017057,0.238372)) %>%
   layout(
@@ -136,7 +135,6 @@ plot_ly(x = c(-119.9999, -119.7117), y = c(0.017057,0.238372)) %>%
       sizing = "stretch"
     )
   )
-#---- Adjusting the map in plotly
 # plot_ly(x = c(-119.9999, -119.7117), y = c(0.017057,0.238372)) %>%
 # plot_ly(MobileSensorReadings_byloc, x = ~Long, 
 #     y = ~Lat) %>%
@@ -170,7 +168,7 @@ ggplot(data = StaticSensorLocations, aes(x=Long, y=Lat)) +
   geom_point(data = StaticSensorLocations, aes(x = Long, y = Lat), 
                                                shape=23, fill="red", color="black",
                                                size = 4) +
-  geom_text(aes(label=StaticSensorLocations$`Sensor-id`),hjust=-0.75, vjust=1)
+  geom_text(aes(label=StaticSensorLocations$`Sensor-id`, "bold"),hjust=-0.75, vjust=1)
 
 ```
  
