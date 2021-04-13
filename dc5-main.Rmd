@@ -31,6 +31,9 @@ StaticSensorLocations <- read_csv("DC5-Data/Sensor Data and Maps/StaticSensorLoc
 
 StaticSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/StaticSensorReadings.csv") %>% 
   mutate(time = as.POSIXct(Timestamp)) %>% select(-Timestamp)
+
+# Image no label with colored neighborhoods
+img <- png::readPNG("DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodMapNoLabels.png")
 ```
 
 ```{r}
@@ -44,26 +47,10 @@ StHimark <- st_read(
 map <- ggplot() + 
   geom_sf(data = StHimark, size = 0.25, color = "white", fill = "#69b3a2") + 
   ggtitle("Boundary Plot") + 
-  coord_sf() +
+  # coord_sf(xlim = c(0,100), ylim = c(0,100)) +
   theme_void() 
-# +
-#   geom_point(data = StaticSensorLocations, aes(x = Long, y = Lat))
-```
 
-this one has neighbourhoods
-
-```{r}
-my_spdf <- readOGR(
-  dsn= "DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/",
-  layer="StHimark",
-  verbose=FALSE)
-
-spdf_fortified <- tidy(my_spdf)
-# Plot it
-map2 <- ggplot() +
-  geom_polygon(data = spdf_fortified, aes( x = long, y = lat, group = group),
-               fill="#69b3a2", color="white") +
-  theme_void()
+ggplotly(map)
 ```
 
 ask about extensions and shapefile, whether we can just use the shapefile itself 
@@ -73,6 +60,8 @@ ask about extensions and shapefile, whether we can just use the shapefile itself
 
 ### Mobile
 
+Aggregate through time 
+
 ```{r}
 MobileSensorReadings_by_min <- MobileSensorReadings %>%
   group_by(time) %>% mutate(min_Value = sum(Value)) %>% distinct(time, .keep_all=T)%>%
@@ -81,27 +70,107 @@ max(MobileSensorReadings_by_min$min_Value) # 2020-04-09 02:43:25
 ggplot(MobileSensorReadings_by_min, aes(x=time, y=min_Value)) + geom_line()
 ```
 
-By location
 
 ```{r}
 # map + geom_point(data = MobileSensorReadings, aes(x=Long, y=Lat))
-ggplot() + geom_point(data = MobileSensorReadings[1:2000,], aes(x=Long, y=Lat))
-MobileSensorReadings_byloc <- MobileSensorReadings%>%
-  group_by(Long, Lat, time) %>% mutate(min_Value = sum(Value))
-
-fig <- MobileSensorReadings_byloc %>%
-  plot_ly(x = ~Long, y = ~Lat, frame = ~time, size = ~Value, type = 'scatter', mode = 'markers', showlegend = T) #%>%
-  # layout(xaxis = list(type = "log"))
-fig
+set.seed(21)
+small_MobileSensorReadings <- MobileSensorReadings %>%
+  sample_frac(0.2)
+ggplot() + geom_point(data = small_MobileSensorReadings, aes(x=Long, y=Lat)) +
+  geom_point(data = StaticSensorLocations, aes(x = Long, y = Lat, color = "red")) 
 ```
 
+By location
+
+```{r}
+set.seed(21)
+MobileSensorReadings_byloc <- small_MobileSensorReadings %>%
+  sample_frac(0.001) %>% # test smaller 
+  mutate(hour=lubridate::floor_date(time, "1 hour")) %>%
+  group_by(Long, Lat, hour) %>% mutate(min_Value = sum(Value))
+
+fig <- MobileSensorReadings_byloc %>%
+  plot_ly(
+    x = ~Long, 
+    y = ~Lat, 
+    size = ~min_Value, 
+    color = ~min_Value, 
+    frame = ~as.character(hour), 
+    type = 'scatter',
+    mode = 'markers'
+  )%>%
+  animation_opts(0) %>%
+  layout(
+    image = list(  
+      source =  raster2uri(as.raster(img)),
+      xref = "x", yref = "y",
+      x = -119.9999,  y = 0.017057,
+      xanchor = "left", yanchor = "bottom",
+      sizex = 0.288152,
+      # max(MobileSensorReadings$Long)-min(MobileSensorReadings$Long), 
+      sizey =0.221315, 
+      # max(MobileSensorReadings$Lat)-min(MobileSensorReadings$Lat),
+      sizing = "stretch"
+      # opacity = 0.8,
+      # layer = "below"
+    )
+  )
+fig
+
+plot_ly(x = c(-119.9999, -119.7117), y = c(0.017057,0.238372)) %>%
+  layout(
+    image = list(
+      source =  raster2uri(as.raster(img)),
+      x = -119.9999,  y = 0.017057,
+      sizex = 0.288152, sizey =0.221315,
+      xref = "x", yref = "y",
+      xanchor = "left", yanchor = "bottom",
+      sizing = "stretch"
+    )
+  )
+
+plot_ly() %>%
+  layout(
+    images = list(
+      source = raster2uri(as.raster(img)),
+      x = -2, y = 2, 
+      sizex = 2, sizey = 1,
+      xref = "x", yref = "y",
+      xanchor = "left", yanchor = "bottom",
+      sizing = "stretch"
+    )
+  )
+```
 
 
 ### Static
 
+map 
+
 ```{r}
+ggplot(data = StaticSensorLocations, aes(x=Long, y=Lat)) + 
+  scale_y_continuous(limits = c(min(MobileSensorReadings$Lat),
+                                max(MobileSensorReadings$Lat)),
+                     expand = expansion(c(0.075,0))) +
+  scale_x_continuous(limits = c(min(MobileSensorReadings$Long),
+                                max(MobileSensorReadings$Long)),
+                     expand = expansion(mult = c(0, 0))) + 
+  ggpubr::background_image(img) +
+  # geom_point(data = small_MobileSensorReadings, aes(x=Long, y=Lat), alpha = 0.2) +
+  geom_point(data = StaticSensorLocations, aes(x = Long, y = Lat), 
+                                               shape=23, fill="red", color="black",
+                                               size = 4) +
+  geom_text(aes(label=StaticSensorLocations$`Sensor-id`),hjust=-0.75, vjust=1)
 
 ```
+ 
+
+```{r}
+ggplot(data=StaticSensorReadings, aes(y=Value, x=time)) +
+  geom_line() + 
+  facet_wrap(~`Sensor-id`) + theme_bw()
+```
+
 
 # Text Analysis
 
