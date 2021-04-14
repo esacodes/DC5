@@ -308,11 +308,28 @@ map4 <- ggplot() +
 ```
 
 ```{r}
+neighborhoods_list <- c()
+for (i in text_coords$NAME) {
+  append(neighborhoods_list, i)
+  neighborhoods_list <- c(neighborhoods_list, i)
+}
+#https://www.tutorialspoint.com/r/r_for_loop.htm
+#https://www.programmingr.com/fast-r-append-list/
+```
+
+```{r}
+#Trying to get this to work -- baby steps! We're getting there!
+x <- 1:19
+y <- 1:19
+names <- neighborhoods_list
 uris <- purrr::map_chr(
-  neighborhoods, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
+  neighborhoods_list, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
 )
-ggplotly(map4) %>%
+plot_ly(hoverinfo = "none") %>%
+  add_text(x = x, y = y, customdata = uris, text = neighborhoods_list) %>%
   htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+
+#ggplotly(map4) %>% htmlwidgets::onRender(readLines("js/tooltip-image.js"))
 ```
 
 ```{r}
@@ -322,3 +339,31 @@ logos
 ```
 
 Hmm I wonder if the problem is that the neighborhoods list doesn't look like the logos list -- maybe that's preventing it from being a description for the filename.
+^^Yes!! I was RIGHT and I went back and fixed that with the for loop I added
+
+```{r}
+names <- neighborhoods_list
+uris <- purrr::map_chr(
+  neighborhoods_list, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
+)
+plot_ly(StHimark, hoverinfo = "none") %>%
+  add_text(x = text_coords$X, y = text_coords$Y, customdata = uris, text = neighborhoods_list) %>%
+  htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+```
+
+It kinda works! It shows the image when you hover over the text, which is in proportionally around the right place, but it doesn't show the map. (It does have the map if you comment out the text part, but that's not a solution.)
+
+```{r}
+names <- neighborhoods_list
+uris <- purrr::map_chr(
+  neighborhoods_list, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
+)
+
+ggplotly(map4) %>% htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+
+```
+
+Back to square one -- it shows the map, and tries to get some image to appear when you hover over text, but the word cloud isn't showing itself
+
+
+Okay, this isn't really working. I wonder if instead, there's a way to bypass using word clouds altogether and instead use something like the charts that are generated in the tidytext handbook between Jane Austen and others' works. Using crosstalk, we could have the map on one side. When a user hovers over a neighborhood, then a word frequency plot would appear on the other side. Plotted on the graph would be words that appeared in the tweets. On the x-axis, the frequency of those words in tweets from that neighborhood; on the y-axis, frequency of words in tweets from every other neighborhood except that one. That would allow us to see if there are any differences between neighborhoods. If words appear only in that neighborhood and not in others, or vice versa, they could be colored differently.
