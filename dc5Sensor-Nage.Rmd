@@ -1,0 +1,155 @@
+---
+title: "Sensor Data - Nage"
+author: "Nage Ngo"
+date: "4/13/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(sf)
+library(ggplot2)
+# library(rgdal)
+# library(broom)
+# library(tidytext)
+library(plotly)
+```
+
+# Sensor Data
+
+## Import
+```{r}
+# Solved the datetime problem, just change class using other functions, not readr
+
+MobileSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/MobileSensorReadings.csv") %>% 
+  mutate(time = as.POSIXct(Timestamp)) %>% select(-Timestamp)
+
+StaticSensorLocations <- read_csv("DC5-Data/Sensor Data and Maps/StaticSensorLocations.csv")
+
+StaticSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/StaticSensorReadings.csv") %>% 
+  mutate(time = as.POSIXct(Timestamp)) %>% select(-Timestamp)
+
+# Image no label with colored neighborhoods
+img <- png::readPNG("DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodMapNoLabels.png")
+img1<- png::readPNG("DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodMap.png")
+```
+
+```{r}
+StHimark <- st_read(
+  "DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/StHimark.shp")
+```
+
+## Shapefile 
+
+```{r}
+map <- ggplot() + 
+  geom_sf(data = StHimark, size = 0.25, color = "white", fill = "#69b3a2") + 
+  ggtitle("Boundary Plot") + 
+  # coord_sf(xlim = c(0,100), ylim = c(0,100)) +
+  theme_void() 
+
+# ggplotly(map)
+```
+
+ask about extensions and shapefile, whether we can just use the shapefile itself 
+
+
+## Sensor 
+
+### Mobile
+
+Aggregate through time 
+
+```{r}
+MobileSensorReadings_by_min <- MobileSensorReadings %>%
+  group_by(time) %>% mutate(min_Value = sum(Value)) %>% distinct(time, .keep_all=T)%>%
+  select(time, min_Value)
+max(MobileSensorReadings_by_min$min_Value) # 2020-04-09 02:43:25	
+ggplot(MobileSensorReadings_by_min, aes(x=time, y=min_Value)) + geom_line()
+```
+
+
+```{r}
+set.seed(21)
+small_MobileSensorReadings <- MobileSensorReadings %>%
+  sample_frac(0.2)
+# ggplot() + geom_point(data = small_MobileSensorReadings, aes(x=Long, y=Lat)) +
+  # geom_point(data = StaticSensorLocations, aes(x = Long, y = Lat, color = "red")) 
+```
+
+By location
+
+```{r}
+set.seed(21)
+MobileSensorReadings_byloc <- small_MobileSensorReadings %>%
+  sample_frac(0.1) %>% # test smaller
+  mutate(hour=lubridate::floor_date(time, "1 hour")) %>%
+  group_by(Long, Lat, hour) %>% mutate(hourly_Value = sum(Value))
+
+fig <- MobileSensorReadings_byloc %>%
+  plot_ly(
+    x = ~Long, y = ~Lat, frame = ~as.character(hour), 
+    size = ~hourly_Value, sizes = c(10, 50),
+    color = ~hourly_Value, 
+    type = 'scatter', mode = 'markers', 
+    marker = list(
+      sizemode = 'diameter',
+      colorscale = list(c(0, 'rgba(255, 199, 130,0.75)'),
+                        c(1, 'rgba(173, 30, 2, 1)')), showscale=T,
+      cauto = F, cmin = 0, cmax =  max(MobileSensorReadings_byloc$hourly_Value),
+        # 5172437 for the entire dataset
+      line = list(color = 'rgba(51, 6, 0, 1)', width = 2)
+      )
+    )%>%
+  animation_opts(0) %>%
+  layout(
+    images = list(
+      source = raster2uri(as.raster(img1)),
+      x = -119.9999, y = 0.008,
+      sizex = 0.288152, sizey = 0.230372,
+      xref = "x", yref = "y",
+      xanchor = "left", yanchor = "bottom",
+      sizing = "stretch", opacity = 0.7,
+      layer = "below"
+    ), xaxis = list(title=""), yaxis = list(title="")
+  ) %>%
+  animation_slider(
+    currentvalue = list(prefix = "timestamp ", font = list(color="red"))
+  ) %>% hide_colorbar()
+
+fig
+```
+
+
+### Static
+
+map 
+
+```{r}
+# change type of `Sensor-id`
+StaticSensorLocations$`Sensor-id`<- as.character(StaticSensorLocations$`Sensor-id`)
+
+ggplot(data = StaticSensorLocations, aes(x=Long, y=Lat)) + 
+  scale_y_continuous(limits = c(min(MobileSensorReadings$Lat),
+                                max(MobileSensorReadings$Lat)),
+                     expand = expansion(c(0.075,0))) +
+  scale_x_continuous(limits = c(min(MobileSensorReadings$Long),
+                                max(MobileSensorReadings$Long)),
+                     expand = expansion(mult = c(0, 0))) + 
+  ggpubr::background_image(img1) +
+  # geom_point(data = MobileSensorReadings_byloc, aes(x=Long, y=Lat), alpha = 0.2) +
+  geom_point(data = StaticSensorLocations, aes(x = Long, y = Lat), 
+                                               shape=23, fill="red", color="black",
+                                               size = 4) +
+  geom_text(aes(label=StaticSensorLocations$`Sensor-id`, fontface = "bold", size = 12),hjust=-0.75, vjust=1)
+
+```
+ 
+
+```{r}
+ggplot(data=StaticSensorReadings, aes(y=Value, x=time)) +
+  geom_line() + 
+  facet_wrap(~`Sensor-id`) + theme_bw()
+```
+

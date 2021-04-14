@@ -85,7 +85,7 @@ By location
 ```{r}
 set.seed(21)
 MobileSensorReadings_byloc <- small_MobileSensorReadings %>%
-  sample_frac(0.1) %>% # test smaller
+  sample_frac(0.01) %>% # test smaller
   mutate(hour=lubridate::floor_date(time, "1 hour")) %>%
   group_by(Long, Lat, hour) %>% mutate(hourly_Value = sum(Value))
 
@@ -121,33 +121,6 @@ fig <- MobileSensorReadings_byloc %>%
   ) %>% hide_colorbar()
 
 fig
-
-#------ Adjusting the map in plotly
-
-plot_ly(x = c(-119.9999, -119.7117), y = c(0.017057,0.238372)) %>%
-  layout(
-    image = list(
-      source = raster2uri(as.raster(img)),
-      x = -119.9999,  y = 0.017057,
-      sizex = 0.288152, sizey = 0.221315,
-      xref = "x", yref = "y",
-      xanchor = "left", yanchor = "bottom",
-      sizing = "stretch"
-    )
-  )
-# plot_ly(x = c(-119.9999, -119.7117), y = c(0.017057,0.238372)) %>%
-# plot_ly(MobileSensorReadings_byloc, x = ~Long, 
-#     y = ~Lat) %>%
-#   layout(
-#     images = list(
-#       source = raster2uri(as.raster(img)),
-#       x = -119.9999, y = 0.008, 
-#       sizex = 0.288152, sizey = 0.230372,
-#       xref = "x", yref = "y",
-#       xanchor = "left", yanchor = "bottom",
-#       sizing = "stretch", layer = "below"
-#     )
-#   )
 ```
 
 
