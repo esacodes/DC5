@@ -1,0 +1,238 @@
+---
+title: "Text etc analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidyr)
+library(readr)
+library(sf)
+library(ggplot2)
+library(rgdal)
+library(broom)
+library(tidytext)
+library(ggwordcloud)
+library(plotly)
+```
+
+```{r}
+StHimark <- st_read(
+  "DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/StHimark.shp")
+```
+
+# Text Analysis
+
+```{r}
+#Reading in the data
+YInt_data <- read_csv("DC5-Data/Y*Int Social Media Data/YInt.csv")
+```
+
+```{r}
+#Tidying the data
+
+data(stop_words)
+#Goal: I would like to be able to use token = "tweets" in order to preserve # and @ (which are important in understanding tweeting patterns). I don't understand the error message that comes up when I do that, though
+YInt_word <- YInt_data %>%
+  unnest_tokens(word, message) %>% 
+  anti_join(stop_words)
+
+YInt_word %>% 
+  count(word, sort = TRUE)
+```
+
+```{r}
+#There was something about a missing dog?
+YInt_word %>% filter(str_detect(word, "missing"))
+```
+
+```{r}
+#Generating a word cloud from the most frequent words
+
+wordclouddata<- YInt_word %>% 
+  #group_by(location) %>% 
+  count(word, sort = TRUE) %>% 
+  head(100)
+#glimpse(wordclouddata)
+
+set.seed(53)
+ggplot(wordclouddata, aes(label = word, size = n)) +
+  geom_text_wordcloud() #+
+  #scale_size_area(max_size = 10) +
+  #theme_minimal()
+```
+
+
+Goals from group meeting:
+- word cloud for each location (preferably overlaid on map)
+- missing dog (dachschund)
+- anything interesting in messages
+
+
+# Trying to overlay word clouds on map
+
+```{r}
+map2 <- ggplot() + 
+  geom_sf(data = StHimark, size = 0.25, aes(fill = Nbrhood, color = Nbrhood)) + 
+  ggtitle("Boundary Plot") + 
+  coord_sf() +
+  theme_void() +
+  theme(legend.position = "none")
+```
+
+```{r}
+#https://www.tutorialkart.com/r-tutorial/concatenate-two-or-more-strings-in-r/
+a <- "a"
+b <- paste(a,"b", sep="")
+```
+
+```{r}
+#https://plotly.com/r/subplots/
+wordclouddata<- YInt_word %>% 
+  filter(location == "Old Town") %>% 
+  count(word, sort = TRUE) %>% 
+  head(10)
+
+set.seed(53)
+wordcloud <- ggplot(wordclouddata, aes(label = word, size = n)) +
+  geom_text_wordcloud() #+
+  #scale_size_area(max_size = 10) +
+  #theme_minimal()
+
+#subplot(map2, wordcloud)
+#THIS WON'T WORK BECAUSE WORDCLOUDS HAVEN'T BEEN COMBINED WITH PLOTLY YET i'm so sad :'(
+```
+```{r}
+x <- 1:3 
+y <- 1:3
+logos <- c("r-logo", "penguin", "rstudio")
+# base64 encoded string of each image
+uris <- purrr::map_chr(
+  logos, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
+)
+# hoverinfo = "none" will hide the plotly.js tooltip, but the 
+# plotly_hover event will still fire
+plot_ly(hoverinfo = "none") %>%
+  add_text(x = x, y = y, customdata = uris, text = logos) %>%
+  htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+```
+Okay so THAT WORKED AND IT SHOWS IMAGES!!!
+VERY IMPORTANT: source!!! I whole-scale copied and pasted that part, including the .js file which made the tooltip even possible, and I don't even know javascript so I should NOT take credit for that!! I got it from here: https://plotly-r.com/supplying-custom-data.html#fig:tooltip-image
+
+Info on ggsave: https://www.tutorialgateway.org/save-r-ggplot-using-ggsave/
+```{r}
+location_word_cloud <- function(neighborhood) {
+  
+wordclouddata<- YInt_word %>% 
+  filter(location == neighborhood) %>% 
+  count(word, sort = TRUE) %>% 
+  head(100)
+
+set.seed(53)
+wordcloud <- ggplot(wordclouddata, aes(label = word, size = n)) +
+  geom_text_wordcloud() +
+  #scale_size_area(max_size = 10) +
+  theme_minimal()
+
+name <- paste(neighborhood, ".png", sep = "")
+ggsave(path = "images", filename = name)
+
+}
+#I wasn't sure if i could save within a function but apparently i can yay https://stackoverflow.com/questions/28176528/saving-within-a-function-in-r
+
+```
+
+```{r}
+#checking --- IT WORKS!
+location_word_cloud("East Parton")
+```
+
+```{r}
+neighborhoods <- list(levels(StHimark$Nbrhood))
+#problem: it was giving me the levels and not just the names https://stackoverflow.com/questions/27676404/list-all-factor-levels-of-a-data-frame
+pmap(neighborhoods, location_word_cloud)
+```
+
+
+Okay so now I need to find a way to connect this to the map. For the custom js tooltip, I need to put text onto the map. I'm not sure if a normal geom_sf label will work, so I'm going to add text using geom_text onto a point in each neighborhood. However, in order to do this I need a point that is definitely within each neighborhood -- I'll try st_point_on_surface, found from https://r-spatial.github.io/sf/reference/geos_unary.html
+
+Wait I found a resource that walks you through doing exactly that: https://yutani.rbind.io/post/geom-sf-text-and-geom-sf-label-are-coming/
+
+```{r}
+text_points <- sf::st_point_on_surface(StHimark)
+
+
+# retrieve the coordinates
+text_coords <- as.data.frame(sf::st_coordinates(text_points))
+text_coords$NAME <- StHimark$Nbrhood
+```
+
+```{r}
+map4 <- ggplot() +
+  geom_sf(data = StHimark, aes(fill = Nbrhood)) +
+  geom_text(data = text_coords, aes(X, Y, label = NAME), color = "white") +
+  theme_void() +
+  theme(legend.position = "none")
+```
+
+```{r}
+neighborhoods_list <- c()
+for (i in text_coords$NAME) {
+  append(neighborhoods_list, i)
+  neighborhoods_list <- c(neighborhoods_list, i)
+}
+#https://www.tutorialspoint.com/r/r_for_loop.htm
+#https://www.programmingr.com/fast-r-append-list/
+```
+
+```{r}
+#Trying to get this to work -- baby steps! We're getting there!
+x <- 1:19
+y <- 1:19
+names <- neighborhoods_list
+uris <- purrr::map_chr(
+  neighborhoods_list, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
+)
+plot_ly(hoverinfo = "none") %>%
+  add_text(x = x, y = y, customdata = uris, text = neighborhoods_list) %>%
+  htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+
+#ggplotly(map4) %>% htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+```
+
+```{r}
+neighborhoods
+logos <- c("r-logo", "penguin", "rstudio")
+logos
+```
+
+Hmm I wonder if the problem is that the neighborhoods list doesn't look like the logos list -- maybe that's preventing it from being a description for the filename.
+^^Yes!! I was RIGHT and I went back and fixed that with the for loop I added
+
+```{r}
+names <- neighborhoods_list
+uris <- purrr::map_chr(
+  neighborhoods_list, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
+)
+plot_ly(StHimark, hoverinfo = "none") %>%
+  add_text(x = text_coords$X, y = text_coords$Y, customdata = uris, text = neighborhoods_list) %>%
+  htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+```
+
+It kinda works! It shows the image when you hover over the text, which is in proportionally around the right place, but it doesn't show the map. (It does have the map if you comment out the text part, but that's not a solution.)
+
+```{r}
+names <- neighborhoods_list
+uris <- purrr::map_chr(
+  neighborhoods_list, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
+)
+
+ggplotly(map4) %>% htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+
+```
+
+Back to square one -- it shows the map, and tries to get some image to appear when you hover over text, but the word cloud isn't showing itself
+
+
+Okay, this isn't really working. I wonder if instead, there's a way to bypass using word clouds altogether and instead use something like the charts that are generated in the tidytext handbook between Jane Austen and others' works. Using crosstalk, we could have the map on one side. When a user hovers over a neighborhood, then a word frequency plot would appear on the other side. Plotted on the graph would be words that appeared in the tweets. On the x-axis, the frequency of those words in tweets from that neighborhood; on the y-axis, frequency of words in tweets from every other neighborhood except that one. That would allow us to see if there are any differences between neighborhoods. If words appear only in that neighborhood and not in others, or vice versa, they could be colored differently.
