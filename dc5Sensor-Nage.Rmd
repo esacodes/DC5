@@ -6,20 +6,17 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = F, message = F, error = F)
 library(tidyverse)
 library(sf)
 library(ggplot2)
-# library(rgdal)
-# library(broom)
-# library(tidytext)
 library(plotly)
 ```
 
-# Sensor Data
+Sensor Data
 
 ## Import
-```{r}
+```{r csv and images}
 # Solved the datetime problem, just change class using other functions, not readr
 
 MobileSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/MobileSensorReadings.csv") %>% 
@@ -35,7 +32,7 @@ img <- png::readPNG("DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodMapNoLabe
 img1<- png::readPNG("DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodMap.png")
 ```
 
-```{r}
+```{r shapefile}
 StHimark <- st_read(
   "DC5-Data/Sensor Data and Maps/StHimarkNeighborhoodShapefiles/StHimark.shp")
 ```
@@ -61,7 +58,7 @@ ask about extensions and shapefile, whether we can just use the shapefile itself
 
 Aggregate through time 
 
-```{r}
+```{r time line plot}
 MobileSensorReadings_by_min <- MobileSensorReadings %>%
   group_by(time) %>% mutate(min_Value = sum(Value)) %>% distinct(time, .keep_all=T)%>%
   select(time, min_Value)
@@ -70,23 +67,19 @@ ggplot(MobileSensorReadings_by_min, aes(x=time, y=min_Value)) + geom_line()
 ```
 
 
-```{r}
+```{r clean and sample}
 set.seed(21)
-small_MobileSensorReadings <- MobileSensorReadings %>%
-  sample_frac(0.2)
-# ggplot() + geom_point(data = small_MobileSensorReadings, aes(x=Long, y=Lat)) +
-  # geom_point(data = StaticSensorLocations, aes(x = Long, y = Lat, color = "red")) 
+
+MobileSensorReadings_t <- MobileSensorReadings %>%
+  mutate(hour=lubridate::floor_date(time, "1 hour")) %>%
+  group_by(Long, Lat, hour) %>% mutate(hourly_Value = sum(Value))
+MobileSensorReadings_byloc <- MobileSensorReadings_t %>% 
+    sample_frac(0.0022) # test smaller
 ```
 
 By location
 
-```{r}
-set.seed(21)
-MobileSensorReadings_byloc <- small_MobileSensorReadings %>%
-  sample_frac(0.1) %>% # test smaller
-  mutate(hour=lubridate::floor_date(time, "1 hour")) %>%
-  group_by(Long, Lat, hour) %>% mutate(hourly_Value = sum(Value))
-
+```{r map and mobile hourly}
 fig <- MobileSensorReadings_byloc %>%
   plot_ly(
     x = ~Long, y = ~Lat, frame = ~as.character(hour), 
@@ -126,7 +119,7 @@ fig
 
 map 
 
-```{r}
+```{r positions of static }
 # change type of `Sensor-id`
 StaticSensorLocations$`Sensor-id`<- as.character(StaticSensorLocations$`Sensor-id`)
 
@@ -147,9 +140,60 @@ ggplot(data = StaticSensorLocations, aes(x=Long, y=Lat)) +
 ```
  
 
-```{r}
+```{r facet and clean}
 ggplot(data=StaticSensorReadings, aes(y=Value, x=time)) +
   geom_line() + 
   facet_wrap(~`Sensor-id`) + theme_bw()
+
+StaticSensorReadings$`Sensor-id` <- as.character(StaticSensorReadings$`Sensor-id`)
+
+set.seed(21)
+StaticSensorReadings_t <- StaticSensorReadings %>% mutate(hour=lubridate::floor_date(time, "1 hour")) %>%
+  group_by(`Sensor-id`, hour) %>% mutate(hourly_Value = sum(Value)) %>%
+  full_join(StaticSensorLocations, by = "Sensor-id")
+StaticSensorReadings_byloc <- StaticSensorReadings_t %>% sample_frac(0.01)
 ```
 
+By location
+
+```{r map and static hourly}
+fig2 <- StaticSensorReadings_byloc %>%
+  plot_ly(
+    x = ~Long, y = ~Lat, frame = ~as.character(hour), 
+    size = ~hourly_Value, sizes = c(5,20),
+    color = ~hourly_Value, 
+    type = 'scatter', mode = 'markers', 
+    marker = list(
+      sizemode = 'diameter',
+      colorscale = list(c(0, 'rgba(255, 199, 130,0.75)'),
+                        c(1, 'rgba(173, 30, 2, 1)')), showscale=T,
+      cauto = F, cmin = 0, cmax =  max(MobileSensorReadings_byloc$hourly_Value),
+        # 5172437 for the entire dataset
+      line = list(color = 'rgba(51, 6, 0, 1)', width = 2)
+      )
+    )%>%
+  animation_opts(0) %>%
+  layout(
+    images = list(
+      source = raster2uri(as.raster(img1)),
+      x = -119.9999, y = 0.008,
+      sizex = 0.288152, sizey = 0.230372,
+      xref = "x", yref = "y",
+      xanchor = "left", yanchor = "bottom",
+      sizing = "stretch", opacity = 0.7,
+      layer = "below"
+    ), xaxis = list(title=""), yaxis = list(title="")
+  ) %>%
+  animation_slider(
+    currentvalue = list(prefix = "timestamp ", font = list(color="red"))
+  ) %>% hide_colorbar()
+
+fig2
+```
+
+
+For comparison, max(StaticSensorReadings_t$hourly_Value) = 21,401.26
+max(Mobile) = 5,172,437, because more sensors and observation (0.01 sample of the data)
+--> sample by number, not fraction. *7705 and 7234*; keep max color in color scale the same
+
+max(MobileSensorReadings_byloc$hourly_Value)/max(StaticSensorReadings_byloc$hourly_Value) = 241.6884
