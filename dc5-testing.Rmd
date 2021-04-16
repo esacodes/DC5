@@ -9,3 +9,15 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library(tidyverse)
+library(readr)
+library(sf)
+```
+
+```{r}
+DamageData <- read_csv("mc1-reports-data.csv") %>% 
+  mutate(time = as.POSIXct(Timestamp)) %>% select(-Timestamp)
+```
+
+
