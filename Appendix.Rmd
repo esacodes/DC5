@@ -1,0 +1,53 @@
+---
+title: "DC 5 Appendix"
+date: "4/18/2021"
+output:   
+  html_document:
+    toc: true
+    toc_depth: 3
+    theme: cerulean
+    highlight: tango
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align="center")
+```
+
+# Radiation Sensors
+
+
+### Mobile Sensor Readings
+
+![Figure 1: Mobile Radiation Sensor Readings.](./output-graphs/mobile-sensor-all.png)
+
+```{r, fig.cap = "Mobile Sensor Map"}
+# htmltools::includeHTML("./output-graphs/mobile-sensor.html")
+```
+
+
+<video width="480" height="280" controls>
+  <source src="./output-graphs/mobile-radiation-sensor.webm" type="video/webm">
+</video>
+
+Figure 2: Mobile Radiation Sensor Map
+
+
+### Static Sensor Readings
+
+```{r, fig.cap = "Static Sensor Map"}
+# htmltools::includeHTML("./output-graphs/static-sensor.html")
+```
+
+<video width="480" height="280" controls>
+  <source src="./output-graphs/static-radiation-sensor.webm" type="video/webm">
+</video>
+
+Figure 3: Static Radiation Sensor Map
+
+![Figure 4: Static Radiation Readings by Sensors](./output-graphs/static-sensor-facet.png)
+
+
+# Text Data
+

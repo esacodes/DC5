@@ -11,6 +11,7 @@ library(tidyverse)
 library(sf)
 library(ggplot2)
 library(plotly)
+library(htmlwidgets)
 ```
 
 Sensor Data
@@ -63,7 +64,8 @@ MobileSensorReadings_by_min <- MobileSensorReadings %>%
   group_by(time) %>% mutate(min_Value = sum(Value)) %>% distinct(time, .keep_all=T)%>%
   select(time, min_Value)
 max(MobileSensorReadings_by_min$min_Value) # 2020-04-09 02:43:25	
-ggplot(MobileSensorReadings_by_min, aes(x=time, y=min_Value)) + geom_line()
+g1 <- ggplot(MobileSensorReadings_by_min, aes(x=time, y=min_Value)) + geom_line() + labs(y="Radiation Level", x = "Time", title = "Radiation Readings by Mobile Sensors") + theme_bw() 
+ggsave("output-graphs/mobile-sensor-all.png", g1, height = 5.2, width = 9.6, dpi = 600)
 ```
 
 
@@ -112,6 +114,8 @@ fig <- MobileSensorReadings_byloc %>%
   ) %>% hide_colorbar()
 
 fig
+
+saveWidget(as_widget(fig), "output-graphs/mobile-sensor.html")
 ```
 
 
@@ -141,11 +145,13 @@ ggplot(data = StaticSensorLocations, aes(x=Long, y=Lat)) +
  
 
 ```{r facet and clean}
-ggplot(data=StaticSensorReadings, aes(y=Value, x=time)) +
+g2 <- ggplot(data=StaticSensorReadings, aes(y=Value, x=time)) +
   geom_line() + 
   facet_wrap(~`Sensor-id`) + theme_bw()
+ggsave("output-graphs/static-sensor-facet.png", g2, height = 5.2, width = 9.6, dpi = 600)
 
 StaticSensorReadings$`Sensor-id` <- as.character(StaticSensorReadings$`Sensor-id`)
+StaticSensorLocations$`Sensor-id` <- as.character(StaticSensorLocations$`Sensor-id`)
 
 set.seed(21)
 StaticSensorReadings_t <- StaticSensorReadings %>% mutate(hour=lubridate::floor_date(time, "1 hour")) %>%
@@ -189,6 +195,8 @@ fig2 <- StaticSensorReadings_byloc %>%
   ) %>% hide_colorbar()
 
 fig2
+
+saveWidget(as_widget(fig2), "output-graphs/static-sensor.html")
 ```
 
 
