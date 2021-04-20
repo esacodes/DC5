@@ -6,15 +6,13 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
-library(tidyr)
 library(readr)
 library(sf)
 library(ggplot2)
-library(rgdal)
-library(broom)
 library(tidytext)
-library(ggwordcloud)
 library(plotly)
+library(scales)
+library(crosstalk)
 ```
 
 ```{r}
@@ -42,122 +40,22 @@ YInt_word %>%
   count(word, sort = TRUE)
 ```
 
-```{r}
-#There was something about a missing dog?
-YInt_word %>% filter(str_detect(word, "missing"))
-```
-
-```{r}
-#Generating a word cloud from the most frequent words
-
-wordclouddata<- YInt_word %>% 
-  #group_by(location) %>% 
-  count(word, sort = TRUE) %>% 
-  head(100)
-#glimpse(wordclouddata)
-
-set.seed(53)
-ggplot(wordclouddata, aes(label = word, size = n)) +
-  geom_text_wordcloud() #+
-  #scale_size_area(max_size = 10) +
-  #theme_minimal()
-```
-
-
-Goals from group meeting:
-- word cloud for each location (preferably overlaid on map)
-- missing dog (dachschund)
-- anything interesting in messages
 
 
 # Trying to overlay word clouds on map
 
 ```{r}
-map2 <- ggplot() + 
-  geom_sf(data = StHimark, size = 0.25, aes(fill = Nbrhood, color = Nbrhood)) + 
-  ggtitle("Boundary Plot") + 
+map <- ggplot() + 
+  geom_sf(data = StHimark, size = 0.25) + 
+  geom_sf_label(data = StHimark, aes(label = Nbrhood)) +
+  #ggtitle("Boundary Plot") + 
   coord_sf() +
   theme_void() +
   theme(legend.position = "none")
-```
-
-```{r}
-#https://www.tutorialkart.com/r-tutorial/concatenate-two-or-more-strings-in-r/
-a <- "a"
-b <- paste(a,"b", sep="")
-```
-
-```{r}
-#https://plotly.com/r/subplots/
-wordclouddata<- YInt_word %>% 
-  filter(location == "Old Town") %>% 
-  count(word, sort = TRUE) %>% 
-  head(10)
-
-set.seed(53)
-wordcloud <- ggplot(wordclouddata, aes(label = word, size = n)) +
-  geom_text_wordcloud() #+
-  #scale_size_area(max_size = 10) +
-  #theme_minimal()
-
-#subplot(map2, wordcloud)
-#THIS WON'T WORK BECAUSE WORDCLOUDS HAVEN'T BEEN COMBINED WITH PLOTLY YET i'm so sad :'(
-```
-```{r}
-x <- 1:3 
-y <- 1:3
-logos <- c("r-logo", "penguin", "rstudio")
-# base64 encoded string of each image
-uris <- purrr::map_chr(
-  logos, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
-)
-# hoverinfo = "none" will hide the plotly.js tooltip, but the 
-# plotly_hover event will still fire
-plot_ly(hoverinfo = "none") %>%
-  add_text(x = x, y = y, customdata = uris, text = logos) %>%
-  htmlwidgets::onRender(readLines("js/tooltip-image.js"))
-```
-Okay so THAT WORKED AND IT SHOWS IMAGES!!!
-VERY IMPORTANT: source!!! I whole-scale copied and pasted that part, including the .js file which made the tooltip even possible, and I don't even know javascript so I should NOT take credit for that!! I got it from here: https://plotly-r.com/supplying-custom-data.html#fig:tooltip-image
-
-Info on ggsave: https://www.tutorialgateway.org/save-r-ggplot-using-ggsave/
-```{r}
-location_word_cloud <- function(neighborhood) {
-  
-wordclouddata<- YInt_word %>% 
-  filter(location == neighborhood) %>% 
-  count(word, sort = TRUE) %>% 
-  head(100)
-
-set.seed(53)
-wordcloud <- ggplot(wordclouddata, aes(label = word, size = n)) +
-  geom_text_wordcloud() +
-  #scale_size_area(max_size = 10) +
-  theme_minimal()
-
-name <- paste(neighborhood, ".png", sep = "")
-ggsave(path = "images", filename = name)
-
-}
-#I wasn't sure if i could save within a function but apparently i can yay https://stackoverflow.com/questions/28176528/saving-within-a-function-in-r
-
-```
-
-```{r}
-#checking --- IT WORKS!
-location_word_cloud("East Parton")
-```
-
-```{r}
-neighborhoods <- list(levels(StHimark$Nbrhood))
-#problem: it was giving me the levels and not just the names https://stackoverflow.com/questions/27676404/list-all-factor-levels-of-a-data-frame
-pmap(neighborhoods, location_word_cloud)
+plotly_map <- ggplotly(map)
 ```
 
 
-Okay so now I need to find a way to connect this to the map. For the custom js tooltip, I need to put text onto the map. I'm not sure if a normal geom_sf label will work, so I'm going to add text using geom_text onto a point in each neighborhood. However, in order to do this I need a point that is definitely within each neighborhood -- I'll try st_point_on_surface, found from https://r-spatial.github.io/sf/reference/geos_unary.html
-
-Wait I found a resource that walks you through doing exactly that: https://yutani.rbind.io/post/geom-sf-text-and-geom-sf-label-are-coming/
 
 ```{r}
 text_points <- sf::st_point_on_surface(StHimark)
@@ -166,73 +64,311 @@ text_points <- sf::st_point_on_surface(StHimark)
 # retrieve the coordinates
 text_coords <- as.data.frame(sf::st_coordinates(text_points))
 text_coords$NAME <- StHimark$Nbrhood
-```
-
-```{r}
-map4 <- ggplot() +
-  geom_sf(data = StHimark, aes(fill = Nbrhood)) +
-  geom_text(data = text_coords, aes(X, Y, label = NAME), color = "white") +
-  theme_void() +
-  theme(legend.position = "none")
-```
-
-```{r}
 neighborhoods_list <- c()
 for (i in text_coords$NAME) {
   append(neighborhoods_list, i)
   neighborhoods_list <- c(neighborhoods_list, i)
 }
-#https://www.tutorialspoint.com/r/r_for_loop.htm
-#https://www.programmingr.com/fast-r-append-list/
-```
-
-```{r}
-#Trying to get this to work -- baby steps! We're getting there!
-x <- 1:19
-y <- 1:19
 names <- neighborhoods_list
-uris <- purrr::map_chr(
-  neighborhoods_list, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
-)
-plot_ly(hoverinfo = "none") %>%
-  add_text(x = x, y = y, customdata = uris, text = neighborhoods_list) %>%
-  htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+```
 
-#ggplotly(map4) %>% htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+
+# Word frequencies
+From www.tidytextmining.com/tidytext.html
+
+```{r}
+word_frequency <- YInt_word
+
+# removing na values -- from https://stackoverflow.com/questions/35912616/remove-n-a-from-the-data-frame
+word_frequency <- na.omit(word_frequency)
+
+# getting rid of locations that aren't neighborhoods in the map (it'd be great to look at those but not what I'm doing right now)
+word_frequency_locations <- word_frequency %>% 
+  filter(location %in% names)
+```
+
+
+```{r}
+
+# Let's see if we can get a word frequency comparison graph for one neighborhood versus the others -- let's say, Broadview
+word_frequency_locations %>% 
+  mutate(word = str_extract(word, "[a-z']+")) %>% 
+  count(location, word) %>% 
+  group_by(location) %>% 
+  mutate(proportion = n / sum(n)) %>% 
+  select(-n)%>% 
+  pivot_wider(names_from = location, 
+              values_from = proportion) %>% 
+  na.omit() %>% 
+  pivot_longer(-c("Broadview", "word"), names_to = "location", values_to = "proportion") %>% 
+  group_by(word) %>% 
+  mutate(other_proportion = mean(proportion)) %>% 
+  ggplot(aes(x = proportion, y = Broadview, 
+                      color = abs(Broadview - proportion))) +
+  geom_abline(color = "gray40", lty = 2) +
+  geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.001), 
+                       low = "darkslategray4", high = "gray75") +
+  #facet_wrap(~author, ncol = 2) +
+  theme(legend.position="none") +
+  labs(y = "Broadview", x = NULL)
 ```
 
 ```{r}
-neighborhoods
-logos <- c("r-logo", "penguin", "rstudio")
-logos
+word_frequency_locations %>% 
+  mutate(word = str_extract(word, "[a-z']+")) %>%  
+  group_by(location) %>% 
+  mutate(count = n(),
+         proportion = count / sum(count)) %>% 
+  select(-count)%>% 
+  pivot_wider(names_from = location, 
+              values_from = proportion) %>% 
+  na.omit() %>% 
+  pivot_longer(-c("time", "account", "Broadview", "word"), names_to = "location", values_to = "proportion") %>% 
+  group_by(word) %>% 
+  mutate(other_proportion = mean(proportion)) %>% 
+  ggplot(aes(x = proportion, y = Broadview, 
+                      color = abs(Broadview - proportion))) +
+  geom_abline(color = "gray40", lty = 2) +
+  geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.001), 
+                       low = "darkslategray4", high = "gray75") +
+  #facet_wrap(~author, ncol = 2) +
+  theme(legend.position="none") +
+  labs(y = "Broadview", x = NULL)
 ```
-
-Hmm I wonder if the problem is that the neighborhoods list doesn't look like the logos list -- maybe that's preventing it from being a description for the filename.
-^^Yes!! I was RIGHT and I went back and fixed that with the for loop I added
 
 ```{r}
-names <- neighborhoods_list
-uris <- purrr::map_chr(
-  neighborhoods_list, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
-)
-plot_ly(StHimark, hoverinfo = "none") %>%
-  add_text(x = text_coords$X, y = text_coords$Y, customdata = uris, text = neighborhoods_list) %>%
-  htmlwidgets::onRender(readLines("js/tooltip-image.js"))
-```
 
-It kinda works! It shows the image when you hover over the text, which is in proportionally around the right place, but it doesn't show the map. (It does have the map if you comment out the text part, but that's not a solution.)
+# Let's see if we can get a word frequency comparison graph for one neighborhood versus the others -- let's say, Broadview
+word_frequency_locations %>% 
+  mutate(word = str_extract(word, "[a-z']+"),
+         tot_num_words = n()) %>% 
+  #count(location, word) %>% 
+  group_by(location) %>% 
+  mutate(words_in_location = n()) %>% 
+  group_by(location, word) %>% 
+  mutate(loc_word_count = n(),
+         loc_proportion = loc_word_count / words_in_location) %>% 
+  group_by(word) %>% 
+  mutate(all_word_count = n(),
+         all_proportion = all_word_count / tot_num_words,
+         other_word_count = all_word_count - loc_word_count,
+         words_in_other_location = tot_num_words - words_in_location,
+         other_proportion = other_word_count / words_in_other_location) %>% 
+  distinct(location, loc_proportion, .keep_all = TRUE) %>% 
+  select(location, word, loc_proportion, other_proportion) %>% 
+  filter(location == "Broadview") %>% 
+  mutate(loc_proportion = ifelse(is.na(loc_proportion), 0, loc_proportion)) %>% 
+  na.omit() %>% 
+  ggplot(aes(x = other_proportion, y = loc_proportion, 
+                      color = abs(loc_proportion - other_proportion))) +
+  geom_abline(color = "gray40", lty = 2) +
+  geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.001), 
+                       low = "gray75", high = "darkslategray4") +
+  #facet_wrap(~author, ncol = 2) +
+  theme(legend.position="none") +
+  labs(y = "Broadview", x = "Other Neighborhoods")
+```
+```{r}
+StHimark_word <- StHimark %>% 
+  mutate(location = Nbrhood) %>% 
+  select(geometry, location)
+```
 
 ```{r}
-names <- neighborhoods_list
-uris <- purrr::map_chr(
-  neighborhoods_list, ~ base64enc::dataURI(file = sprintf("images/%s.png", .x))
-)
-
-ggplotly(map4) %>% htmlwidgets::onRender(readLines("js/tooltip-image.js"))
+# Let's see if we can get a word frequency comparison graph for one neighborhood versus the others -- let's say, Broadview
+all_data <- word_frequency_locations %>% 
+  mutate(word = str_extract(word, "[a-z']+"),
+         tot_num_words = n()) %>% 
+  #count(location, word) %>% 
+  group_by(location) %>% 
+  mutate(words_in_location = n()) %>% 
+  group_by(location, word) %>% 
+  mutate(loc_word_count = n(),
+         loc_proportion = loc_word_count / words_in_location) %>% 
+  group_by(word) %>% 
+  mutate(all_word_count = n(),
+         all_proportion = all_word_count / tot_num_words,
+         other_word_count = all_word_count - loc_word_count,
+         words_in_other_location = tot_num_words - words_in_location,
+         other_proportion = other_word_count / words_in_other_location) %>% 
+  distinct(location, loc_proportion, .keep_all = TRUE) %>% 
+  select(time, location, word, loc_proportion, other_proportion, all_proportion) %>% 
+  #filter(location == "Broadview") %>% 
+  mutate(loc_proportion = ifelse(is.na(loc_proportion), 0, loc_proportion)) %>% 
+  na.omit() %>% 
+  left_join(StHimark_word, by = "location")
 
 ```
 
-Back to square one -- it shows the map, and tries to get some image to appear when you hover over text, but the word cloud isn't showing itself
+```{r}
+new_data <- SharedData$new(all_data)
+```
+
+```{r}
+Broadview <- all_data %>% 
+  select(-geometry) %>% 
+  #filter(location == "Broadview") %>% 
+  ggplot(aes(x = all_proportion, y = loc_proportion, 
+                      color = abs(loc_proportion - all_proportion))) +
+  geom_abline(color = "gray40", lty = 2) +
+  geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.001), 
+                       low = "gray75", high = "darkslategray4") +
+  #facet_wrap(~author, ncol = 2) +
+  theme(legend.position="none") +
+  labs(y = "", x = "Other Neighborhoods") +
+  facet_wrap(~location)
+```
+
+```{r}
+Broadview %>% theme_minimal()
+  
+```
+
+```{r}
+#neighborhood = "Broadview"
+fig <- all_data %>%
+  select(-geometry) %>%
+  mutate(diff = abs(loc_proportion - other_proportion),
+         hour = substr(as.character(time), 12, 13)) %>%
+  #filter(location == "Broadview") %>% 
+  plot_ly(
+    x = ~other_proportion, 
+    y = ~loc_proportion, 
+    frame = ~as.character(hour), 
+    size = ~diff, sizes = c(10, 50),
+    color = ~location,
+    text = ~word,
+    hoverinfo = "text") %>% 
+  layout(xaxis = list(
+    title = "Word Frequency in All Neighborhoods"
+  ),
+  yaxis = list(
+    title = "Word Frequency in Neighborhood"
+  )) %>%
+  animation_slider(
+    currentvalue = list(prefix = "HOUR ")
+  )
+```
+```{r}
+library(htmlwidgets)
+
+saveWidget(as_widget(fig), "output-graphs/plotly_word.html")
+```
+, 
+    marker = list(
+      sizemode = 'diameter',
+      colorscale = list(c(0, 'rgba(255, 199, 130,0.75)'),
+                        c(1, 'rgba(173, 30, 2, 1)'))))
 
 
-Okay, this isn't really working. I wonder if instead, there's a way to bypass using word clouds altogether and instead use something like the charts that are generated in the tidytext handbook between Jane Austen and others' works. Using crosstalk, we could have the map on one side. When a user hovers over a neighborhood, then a word frequency plot would appear on the other side. Plotted on the graph would be words that appeared in the tweets. On the x-axis, the frequency of those words in tweets from that neighborhood; on the y-axis, frequency of words in tweets from every other neighborhood except that one. That would allow us to see if there are any differences between neighborhoods. If words appear only in that neighborhood and not in others, or vice versa, they could be colored differently.
+
+
+```{r}
+bscols(widths = c(3,NA,NA),
+       list(
+         filter_checkbox("location", "Neighborhood", new_data, ~location, inline = TRUE)
+       ),
+       ggplotly(Broadview))
+```
+
+
+```{r}
+d <- SharedData$new(mtcars)
+# make a scatterplot of disp vs mpg
+scatterplot <- plot_ly(d, x = ~mpg, y = ~disp) %>%
+  add_markers(color = I("navy"))
+# define two subplots: boxplot and scatterplot
+subplot(
+  # boxplot of disp
+  plot_ly(d, y = ~disp) %>% 
+    add_boxplot(name = "overall", 
+                color = I("navy")),
+  # scatterplot of disp vs mpg
+  scatterplot, 
+  shareY = TRUE, titleX = T) %>% 
+  layout(dragmode = "select")
+```
+
+```{r}
+new_map <- new_data %>% 
+  select(location, geometry) %>% 
+  ggplot() +
+  geom_sf(data = StHimark, size = 0.25) + 
+  geom_sf_text(data = StHimark, aes(label = Nbrhood))
+new_plotly_map <- ggplotly(new_map)
+```
+
+
+```{r}
+subplot(new_plotly_map,
+        ggplotly(Broadview))
+```
+
+```{r}
+MobileSensorReadings <- read_csv("DC5-Data/Sensor Data and Maps/MobileSensorReadings.csv") %>% 
+  mutate(time = as.POSIXct(Timestamp)) %>% select(-Timestamp)
+
+set.seed(21)
+small_MobileSensorReadings <- MobileSensorReadings %>%
+  sample_frac(0.2)
+
+set.seed(21)
+MobileSensorReadings_byloc <- small_MobileSensorReadings %>%
+  sample_frac(0.01) %>% # test smaller
+  mutate(hour=lubridate::floor_date(time, "1 hour")) %>%
+  group_by(Long, Lat, hour) %>% mutate(hourly_Value = sum(Value))
+```
+
+```{r}
+fig <- MobileSensorReadings_byloc %>%
+  plot_ly(
+    x = ~Long, y = ~Lat, frame = ~as.character(hour), 
+    size = ~hourly_Value, sizes = c(10, 50),
+    color = ~hourly_Value, 
+    type = 'scatter', mode = 'markers', 
+    marker = list(
+      sizemode = 'diameter',
+      colorscale = list(c(0, 'rgba(255, 199, 130,0.75)'),
+                        c(1, 'rgba(173, 30, 2, 1)'))))
+fig
+```
+      , showscale=T,
+      cauto = F, cmin = 0, cmax =  max(MobileSensorReadings_byloc$hourly_Value),
+        # 5172437 for the entire dataset
+      line = list(color = 'rgba(51, 6, 0, 1)', width = 2)
+      )
+    )%>%
+    animation_opts(0) %>%
+  layout(
+    images = list(
+      source = raster2uri(as.raster(img1)),
+      x = -119.9999, y = 0.008,
+      sizex = 0.288152, sizey = 0.230372,
+      xref = "x", yref = "y",
+      xanchor = "left", yanchor = "bottom",
+      sizing = "stretch", opacity = 0.7,
+      layer = "below"
+    ), xaxis = list(title=""), yaxis = list(title="")
+  ) %>%
+  animation_slider(
+    currentvalue = list(prefix = "timestamp ", font = list(color="red"))
+  ) %>% hide_colorbar()
+```
+
+
